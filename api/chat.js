@@ -32,45 +32,31 @@ S의 목적은
 `.trim();
 
 export default async function handler(req, res) {
-  // ✅ CORS 헤더 (이게 핵심)
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 
-  // ✅ Preflight 요청 처리
-  if (req.method === "OPTIONS") {
-    return res.status(204).end();
-  }
-
-  if (req.method !== "POST") {
-    return res.status(405).json({ error: "Method Not Allowed" });
-  }
+  if (req.method === "OPTIONS") return res.status(200).end();
+  if (req.method !== "POST") return res.status(405).end();
 
   try {
-    // ✅ 프론트에서 보내는 형식에 맞춤
-    const { messages = [], userText } = req.body;
+    const { history, userText } = req.body;
+    if (!userText) return res.status(400).json({ error: "userText missing" });
 
-    if (!userText) {
-      return res.status(400).json({ error: "userText missing" });
-    }
-
-    const inputMessages = [
+    const messages = [
       { role: "system", content: S_SYSTEM_PROMPT },
-      ...messages,
+      ...(history || []),
       { role: "user", content: userText }
     ];
 
     const r = await client.responses.create({
       model: "gpt-4.1-mini",
-      input: inputMessages
+      input: messages
     });
 
     const reply = r.output_text?.trim() || "";
-
-    // ✅ 프론트가 기대하는 키
-    return res.status(200).json({ reply });
+    res.json({ text: reply });
   } catch (err) {
-    console.error(err);
-    return res.status(500).json({ error: err.message || "server error" });
+    res.status(500).json({ error: err.message });
   }
 }
